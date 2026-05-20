@@ -11,8 +11,8 @@ Console.WriteLine("=================================");
 // FILE PATHS
 // =====================================================
 
-string file1Path = "input/AX/data.xlsx";
-string file2Path = "input/Lamp/UNREALISEDOUTPUTVAT.xlsx";
+string file1Path = "input/file1.xlsx";
+string file2Path = "input/file2.xlsx";
 string file3Path = "input/file3.xlsx";
 
 // =====================================================
