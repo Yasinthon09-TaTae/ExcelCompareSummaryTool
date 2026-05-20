@@ -1,5 +1,7 @@
 vscode
 
+.net sdk
+
 install Extention C#
 
 npm install
