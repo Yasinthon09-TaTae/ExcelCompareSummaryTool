@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "dgSpecHash": "DNmPsqjGmlQ=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\yasinthon\\Project\\Summery Excel File\\ExcelSummaryTool\\ExcelSummaryTool.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\yasinthon\\.nuget\\packages\\exceldatareader\\3.8.0\\exceldatareader.3.8.0.nupkg.sha512",
+    "C:\\Users\\yasinthon\\.nuget\\packages\\exceldatareader.dataset\\3.8.0\\exceldatareader.dataset.3.8.0.nupkg.sha512"
+  ],
+  "logs": []
+}
