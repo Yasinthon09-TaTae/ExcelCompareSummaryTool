@@ -26,13 +26,59 @@ CheckFile(file2Path);
 bool hasFile3 = File.Exists(file3Path);
 
 // =====================================================
+// ACCOUNT GROUPS
+// FORMAT:
+// (111,112),(222,223),333,444
+// =====================================================
+
+// string accountGroupText =
+//      "(513010,513610),513110,513210";
+Console.WriteLine();
+Console.WriteLine("=================================");
+Console.WriteLine("INPUT ACCOUNT GROUP");
+Console.WriteLine("=================================");
+
+Console.WriteLine("Example:");
+Console.WriteLine("(AccountCode,AccountCode),AccountCode,AccountCode");
+Console.WriteLine("(111111,111112),123456,123457");
+Console.WriteLine();
+
+Console.Write("Enter Account Group: ");
+
+string? accountGroupText =
+    Console.ReadLine();
+
+if (string.IsNullOrWhiteSpace(accountGroupText))
+{
+    Console.WriteLine(
+        "Account Group is required."
+    );
+
+    Console.ReadLine();
+
+    return;
+}
+
+var accountGroups =
+    BuildAccountGroups(accountGroupText);
+
+if (accountGroups.Count == 0)
+{
+    Console.WriteLine(
+        "Invalid Account Group Format."
+    );
+
+    Console.ReadLine();
+
+    return;
+}
+// =====================================================
 // FILTER IDS
 // =====================================================
 
-var ids = new HashSet<string>
-{
-    "236100"
-};
+var ids = new HashSet<string>(
+    accountGroups.Keys
+);
 
 // =====================================================
 // FILE CONFIGS
@@ -50,7 +96,7 @@ var file1Config = new FileConfig
 
 // FILE 2
 // 01 = DEBIT
-// 02 = CREDIT 
+// 02 = CREDIT
 var file2Config = new FileConfig
 {
     IdColumn = "ACCOUNT_CODE",
@@ -85,7 +131,8 @@ Console.WriteLine("Reading File 1...");
 var file1Summary = BuildSummary(
     file1Path,
     ids,
-    file1Config
+    file1Config,
+    accountGroups
 );
 
 Console.WriteLine("Reading File 2...");
@@ -93,7 +140,8 @@ Console.WriteLine("Reading File 2...");
 var file2Summary = BuildSummary(
     file2Path,
     ids,
-    file2Config
+    file2Config,
+    accountGroups
 );
 
 // OPTIONAL FILE 3
@@ -107,7 +155,8 @@ if (hasFile3)
     file3Summary = BuildSummary(
         file3Path,
         ids,
-        file3Config
+        file3Config,
+        accountGroups
     );
 }
 else
@@ -134,42 +183,14 @@ var finalKeys = allKeys
     .ToList();
 
 // =====================================================
-// OUTPUT
+// OUTPUT PER ACCOUNT GROUP
 // =====================================================
 
 Directory.CreateDirectory("output");
 
-var lines = new List<string>();
-
-lines.Add(
-    "AccountId," +
-    "ContractNo," +
-
-    // FILE 1
-    "File1DebitSum," +
-    "File1RecordDebit," +
-    "File1CreditSum," +
-    "File1RecordCredit," +
-    "File1Amount," +
-
-    // FILE 2
-    "File2DebitSum," +
-    "File2RecordDebit," +
-    "File2CreditSum," +
-    "File2RecordCredit," +
-    "File2Amount," +
-
-    // FILE 3
-    "File3DebitSum," +
-    "File3RecordDebit," +
-    "File3CreditSum," +
-    "File3RecordCredit," +
-    "File3Amount"
-);
-
-// =====================================================
-// COMPARE
-// =====================================================
+// account -> csv lines
+var outputMap =
+    new Dictionary<string, List<string>>();
 
 foreach (var key in finalKeys)
 {
@@ -243,10 +264,66 @@ foreach (var key in finalKeys)
         data3.DebitSum - data3.CreditSum;
 
     // =================================================
-    // EXPORT
+    // STATUS
     // =================================================
 
-    lines.Add(
+    string status =
+        (sameDebit && sameCredit)
+        ? "MATCH"
+        : "NOT_MATCH";
+
+    // =================================================
+    // FILE NAME
+    // =================================================
+
+    string accountFileName = key.Id;
+
+    // =================================================
+    // CREATE FILE
+    // =================================================
+
+    if (!outputMap.ContainsKey(accountFileName))
+    {
+        outputMap[accountFileName] =
+            new List<string>();
+
+        // HEADER
+        outputMap[accountFileName].Add(
+            "Status," +
+
+            "AccountGroup," +
+            "ContractNo," +
+
+            // FILE 1
+            "File1DebitSum," +
+            "File1RecordDebit," +
+            "File1CreditSum," +
+            "File1RecordCredit," +
+            "File1Amount," +
+
+            // FILE 2
+            "File2DebitSum," +
+            "File2RecordDebit," +
+            "File2CreditSum," +
+            "File2RecordCredit," +
+            "File2Amount," +
+
+            // FILE 3
+            "File3DebitSum," +
+            "File3RecordDebit," +
+            "File3CreditSum," +
+            "File3RecordCredit," +
+            "File3Amount"
+        );
+    }
+
+    // =================================================
+    // ADD ROW
+    // =================================================
+
+    outputMap[accountFileName].Add(
+        $"{status}," +
+
         $"{key.Id}," +
         $"{key.Number}," +
 
@@ -274,19 +351,33 @@ foreach (var key in finalKeys)
 }
 
 // =====================================================
-// WRITE CSV
+// WRITE FILES
 // =====================================================
 
-File.WriteAllLines(
-    "output/compare_result.csv",
-    lines
-);
+foreach (var item in outputMap)
+{
+    string safeFileName =
+        item.Key
+            .Replace("/", "_")
+            .Replace("\\", "_");
+
+    string fileName =
+        $"output/{safeFileName}.csv";
+
+    File.WriteAllLines(
+        fileName,
+        item.Value
+    );
+
+    Console.WriteLine(
+        $"Created: {fileName}"
+    );
+}
 
 Console.WriteLine();
 Console.WriteLine("=================================");
 Console.WriteLine("DONE");
 Console.WriteLine("=================================");
-Console.WriteLine("Output: output/compare_result.csv");
 
 Console.ReadLine();
 
@@ -298,7 +389,8 @@ static Dictionary<(string Id, string Number), Summary>
 BuildSummary(
     string filePath,
     HashSet<string> ids,
-    FileConfig config
+    FileConfig config,
+    Dictionary<string, string> accountGroups
 )
 {
     var summaryMap =
@@ -432,32 +524,46 @@ BuildSummary(
         try
         {
             // =============================================
-            // ID
+            // ORIGINAL ACCOUNT
             // =============================================
 
-            var id = reader.GetValue(idIndex)?
+            var originalId = reader.GetValue(idIndex)?
                 .ToString()?
                 .Trim();
 
-            if (string.IsNullOrEmpty(id))
+            if (string.IsNullOrEmpty(originalId))
                 continue;
 
             // FILTER IDS
-            if (!ids.Contains(id))
+            if (!ids.Contains(originalId))
                 continue;
 
             // =============================================
-            // NUMBER
+            // GROUP ACCOUNT
+            // =============================================
+
+            var id =
+                accountGroups.ContainsKey(originalId)
+                ? accountGroups[originalId]
+                : originalId;
+
+            // =============================================
+            // CONTRACT NUMBER
             // =============================================
 
             var number = reader.GetValue(numberIndex)?
                 .ToString()?
                 .Trim();
 
-            if (string.IsNullOrEmpty(number))
+            // SKIP IF NO CONTRACT
+            if (string.IsNullOrWhiteSpace(number))
             {
-                number = "UNKNOWN";
+                continue;
             }
+
+            // =============================================
+            // KEY
+            // =============================================
 
             var key = (id, number);
 
@@ -469,7 +575,6 @@ BuildSummary(
 
             // =============================================
             // TYPE MODE
-            // FILE 2
             // =============================================
 
             if (config.UseTransactionType)
@@ -483,11 +588,6 @@ BuildSummary(
                     ParseDecimal(
                         reader.GetValue(amountIndex)
                     );
-
-                // DEBUG
-                // Console.WriteLine(
-                //     $"TYPE={transactionType} AMOUNT={amount}"
-                // );
 
                 // DEBIT
                 if (
@@ -552,6 +652,59 @@ BuildSummary(
     }
 
     return summaryMap;
+}
+
+// =====================================================
+// BUILD ACCOUNT GROUPS
+// =====================================================
+
+static Dictionary<string, string>
+BuildAccountGroups(string input)
+{
+    var result =
+        new Dictionary<string, string>();
+
+    var matches = Regex.Matches(
+        input,
+        @"\((.*?)\)|([^,]+)"
+    );
+
+    foreach (Match match in matches)
+    {
+        string value = "";
+
+        if (match.Groups[1].Success)
+        {
+            value = match.Groups[1].Value;
+        }
+        else
+        {
+            value = match.Groups[2].Value;
+        }
+
+        value = value.Trim();
+
+        if (string.IsNullOrEmpty(value))
+            continue;
+
+        var accounts = value
+            .Split(
+                ',',
+                StringSplitOptions.RemoveEmptyEntries
+            )
+            .Select(x => x.Trim())
+            .ToList();
+
+        string groupName =
+            string.Join("_", accounts);
+
+        foreach (var acc in accounts)
+        {
+            result[acc] = groupName;
+        }
+    }
+
+    return result;
 }
 
 // =====================================================
